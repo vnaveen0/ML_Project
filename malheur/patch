@@ -1,0 +1,89 @@
+Only in /home/jpathy/data/cmpt726/malheur/src: core
+Only in /home/jpathy/data/cmpt726/malheur/src: .deps
+diff -ru ./src/fvec.c /home/jpathy/data/cmpt726/malheur/src/fvec.c
+--- ./src/fvec.c	2014-11-29 14:07:23.995525162 -0800
++++ /home/jpathy/data/cmpt726/malheur/src/fvec.c	2014-11-28 23:06:51.168839921 -0800
+@@ -541,13 +541,27 @@
+ {
+     assert(f && z);
+     int i;
++	feat_t *dim;
+ 
+     gzprintf(z, "%d", l);
++	dim = (feat_t *) malloc(f->len * sizeof(feat_t));
+     for (i = 0; i < f->len; i++) {
+         /* This might leed to collisions */
+-        uint32_t dim = (uint32_t) (f->dim[i] + 1);
+-        gzprintf(z, "  %u:%g", dim, (float) f->val[i]);
++		dim[i] = (f->dim[i] & 0x7FFFFFFF);
++		assert(dim[i] <= 0x7fffffff);
++		if (dim[i] != 0x7FFFFFFF) {
++			dim[i]++;
++		}
+     }
++	qsort(dim, f->len, sizeof(feat_t), cmp_feat);
++	for (i = 0; i < f->len; i++) {
++		if (i < f->len-1 && dim[i] == dim[i+1]) {
++			printf("Collision");
++			continue;
++		}
++		gzprintf(z, "  %u:%g", dim[i], (float) f->val[i]);
++	}
++	free(dim);
+     gzprintf(z, " # %s\n", f->src);
+ }
+ 
+Only in /home/jpathy/data/cmpt726/malheur/src: Makefile
+Only in /home/jpathy/data/cmpt726/malheur/src: Makefile.in
+diff -ru ./src/malheur.c /home/jpathy/data/cmpt726/malheur/src/malheur.c
+--- ./src/malheur.c	2014-11-29 14:07:23.995525162 -0800
++++ /home/jpathy/data/cmpt726/malheur/src/malheur.c	2014-11-29 14:12:22.534189161 -0800
+@@ -35,12 +35,13 @@
+ static int reset = FALSE;
+ static int save = TRUE;
+ static char *fvec_dump = NULL;
++static char *pvec_dump = NULL;
+ static malheur_action_t action = PROTOTYPE;
+ static malheur_cfg_t mcfg;
+ static malheur_state_t mstate;
+ 
+ /* Option string */
+-#define OPTSTRING       "nro:m:hvVd:"
++#define OPTSTRING       "nro:m:hvVd:p:"
+ 
+ /**
+  * Array of options of getopt_long()
+@@ -54,6 +55,7 @@
+    { "version",         0, NULL, 'V' },
+    { "help",            0, NULL, 'h' },
+    { "dump",            1, NULL, 'd' },
++   { "dumproto",		1, NULL, 'p' },
+    /* start of config options */   
+    { "input.format",           1, NULL, 1001 },
+    { "input.mist_level",       1, NULL, 1002 },   
+@@ -137,6 +139,9 @@
+         case 'd':
+             fvec_dump = optarg;
+             break;
++		case 'p':
++            pvec_dump = optarg;
++			break;
+         case 'h':
+         case '?':
+             print_usage();
+@@ -350,6 +355,15 @@
+     if (fvec_dump)
+         farray_save_libsvm_file(fa, fvec_dump);
+ 
++	if (pvec_dump) {
++		assign_t *as;
++		farray_t *pr;
++
++		/* Extract prototypes */
++		pr = proto_extract(fa, &as);
++		farray_save_libsvm_file(pr, pvec_dump);
++	}
++
+     return fa;
+ }
+ 
